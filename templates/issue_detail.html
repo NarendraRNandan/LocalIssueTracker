@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+
+{% block title %}{{ issue.case_code }} &bull; {{ issue.title }} &bull; CivicTrack{% endblock %}
+
+{% block content %}
+
+<!-- Header & Quick Bar -->
+<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+  <div>
+    <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.4rem;">
+      <span style="font-family: monospace; font-size: 1.1rem; font-weight: 800; color: var(--primary-700);">{{ issue.case_code }}</span>
+      <span class="badge badge-{{ issue.status | lower | replace(' ', '') }}">{{ issue.status }}</span>
+      <span class="badge badge-priority-{{ issue.priority | lower }}">{{ issue.priority }} Priority</span>
+      <span class="badge badge-ai">✨ {{ issue.category }}</span>
+    </div>
+    <h1 style="font-size: 1.9rem; font-weight: 800; color: var(--slate-900);">{{ issue.title }}</h1>
+    <p style="color: var(--slate-500); font-size: 0.88rem; margin-top: 0.25rem;">
+      Reported by {{ issue.reporter.name }} &bull; {{ issue.created_at.strftime('%d %B %Y, %I:%M %p') }}
+    </p>
+  </div>
+
+  <div style="display: flex; gap: 0.75rem; align-items: center;">
+    {% if current_user.is_authenticated and current_user.role == 'citizen' and issue.status != 'Resolved' %}
+      <form action="{{ url_for('upvote_issue', issue_id=issue.id) }}" method="POST">
+        <button type="submit" class="btn {% if already_upvoted %}btn-secondary{% else %}btn-primary{% endif %}">
+          <span>👍</span>
+          <span>{% if already_upvoted %}Upvoted{% else %}Upvote Case{% endif %} ({{ issue.upvote_count }})</span>
+        </button>
+      </form>
+    {% else %}
+      <a href="{{ url_for('login') }}" class="btn btn-secondary">
+        <span>👍</span>
+        <span>Sign in to Upvote ({{ issue.upvote_count }})</span>
+      </a>
+    {% endif %}
+
+    {% if current_user.is_authenticated and can_chat %}
+      <a href="{{ url_for('issue_chat', issue_id=issue.id) }}" class="btn btn-secondary">💬 Case Chat{% if issue.status == 'Resolved' %} (Closed){% endif %}</a>
+    {% endif %}
+
+    {% if current_user.is_authenticated and can_manage_case %}
+      <button type="button" class="btn btn-primary" onclick="document.getElementById('authority-action-box').scrollIntoView({behavior: 'smooth'})">
+        ⚙️ Manage Case
+      </button>
+      {% if current_user.is_admin %}
+        <a href="{{ url_for('admin_edit_issue', issue_id=issue.id) }}" class="btn btn-secondary">✏️ Edit</a>
+        <form method="POST" action="{{ url_for('admin_cancel_issue', issue_id=issue.id) }}" onsubmit="return confirm('Cancel this application request?')"><button class="btn btn-secondary">Cancel</button></form>
+        <form method="POST" action="{{ url_for('admin_delete_issue', issue_id=issue.id) }}" onsubmit="return confirm('Permanently delete this application? This cannot be undone.')"><button class="btn btn-secondary">Delete</button></form>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<div class="detail-grid">
+  
+  <!-- Left Side: Main Dossier -->
+  <div>
+    
+    <!-- Description Card -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <h3 class="card-title">📝 Issue Description & Overview</h3>
+      <p style="font-size: 1rem; color: var(--slate-800); line-height: 1.6; white-space: pre-line;">{{ issue.description }}</p>
+
+      {% if issue.ai_summary %}
+        <div style="margin-top: 1.25rem; background: var(--ai-purple-bg); border: 1px solid var(--ai-purple-border); border-radius: var(--radius-md); padding: 0.85rem 1rem;">
+          <strong style="color: var(--ai-purple-text); font-size: 0.85rem; display: block; margin-bottom: 0.2rem;">
+            🤖 AI Action Triage Summary:
+          </strong>
+          <span style="color: #581c87; font-size: 0.88rem;">{{ issue.ai_summary }}</span>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Photo Evidence & Resolution Comparison -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <h3 class="card-title">📸 Photo Evidence & Resolution Proof</h3>
+      
+      <div class="comparison-grid">
+        <div class="comparison-box">
+          <div class="comparison-label">Reported Condition</div>
+          {% if issue.photo_filename %}
+            <img src="{{ url_for('static', filename='uploads/' + issue.photo_filename) }}" alt="Reported Photo">
+          {% else %}
+            <div style="height: 220px; display: flex; align-items: center; justify-content: center; color: var(--slate-400);">
+              No photo uploaded during report
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="comparison-box">
+          <div class="comparison-label">Resolution Proof (Post-Repair)</div>
+          {% if issue.resolution_photo_filename %}
+            <img src="{{ url_for('static', filename='uploads/' + issue.resolution_photo_filename) }}" alt="Resolution Proof">
+          {% else %}
+            <div style="height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--slate-400); background: var(--slate-50); padding: 1rem;">
+              <span>⏳ Awaiting resolution proof photo from field repair team</span>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Official Status History Timeline -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <h3 class="card-title">📜 Official Audit History & Progress Timeline</h3>
+      
+      <ul class="timeline">
+        {% for h in issue.history.all() %}
+          <li class="timeline-item">
+            <div class="timeline-dot" style="background: {% if h.new_status == 'Resolved' %}var(--success-solid){% elif h.new_status == 'In Progress' %}var(--warning-solid){% else %}var(--primary-600){% endif %};"></div>
+            <div class="timeline-content">
+              <div class="timeline-date">{{ h.created_at.strftime('%d %b %Y, %I:%M %p') }}</div>
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                <span class="badge badge-{{ h.new_status | lower | replace(' ', '') }}">{{ h.new_status }}</span>
+                {% if h.changed_by %}
+                  <span style="font-size: 0.8rem; color: var(--slate-500);">by {{ h.changed_by.name }} ({{ h.changed_by.role }})</span>
+                {% endif %}
+              </div>
+              <p style="font-size: 0.88rem; color: var(--slate-700); margin-top: 0.35rem;">
+                {{ h.note }}
+              </p>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <!-- Case Discussion / Chat -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <h3 class="card-title">💬 Work Chat & Discussion</h3>
+
+      <div class="chat-thread" style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 260px; overflow-y: auto; margin-bottom: 1rem; padding-right: 0.25rem;">
+        {% if comments %}
+          {% for comment in comments %}
+            <div class="chat-bubble {% if comment.user_id == current_user.id %}chat-bubble-self{% endif %}">
+              <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                <strong style="font-size: 0.78rem; color: var(--slate-800);">{{ comment.user.name if comment.user else 'System' }}</strong>
+                <span style="font-size: 0.68rem; color: var(--slate-500);">{{ comment.created_at.strftime('%d %b %Y, %I:%M %p') }}</span>
+              </div>
+              <div style="font-size: 0.88rem; color: var(--slate-700); white-space: pre-line;">{{ comment.message }}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div style="padding: 1rem; border: 1px dashed var(--border-strong); border-radius: var(--radius-md); color: var(--slate-500); text-align: center; background: var(--slate-50);">
+            No messages yet. Start the update conversation for this case.
+          </div>
+        {% endif %}
+      </div>
+
+      <form action="{{ url_for('issue_comment', issue_id=issue.id) }}" method="POST">
+        <div class="form-group" style="margin-bottom: 0.75rem;">
+          <textarea name="message" class="form-control" rows="3" placeholder="Add a quick field update, worker note, or public status message..." required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Send Message</button>
+      </form>
+    </div>
+
+    <!-- Authority Management Action Box -->
+    {% if current_user.is_authenticated and can_manage_case %}
+      <div id="authority-action-box" class="card" style="border:2px solid var(--primary-300,#a5b4fc);background:#fafbff">
+        <h3 class="card-title" style="color:var(--primary-800)">⚙️ Officer Action Center</h3>
+        <form action="{{ url_for('assign_worker', issue_id=issue.id) }}" method="POST" style="margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border-subtle)">
+          <label class="form-label">Assign Verified Workers / Authorities</label>
+          <select name="user_id" class="form-select" required>
+            <option value="">Select one local worker or authority...</option>
+            {% for w in workers %}<option value="{{ w.id }}">{{ w.name }} · {{ w.role|title }} · {{ w.phone or 'No phone' }} · {{ w.email }} · {{ w.city_town or '-' }}, {{ w.district or '-' }}</option>{% endfor %}
+          </select>
+          <small style="display:block;color:var(--slate-500);margin-top:.35rem">Add one member at a time. Choose another person and click Add Member again. Only same-location staff are listed.</small>
+          <button type="submit" class="btn btn-secondary" style="margin-top:.6rem">👥 Add Member</button>
+        </form>
+        <form action="{{ url_for('update_issue_status', issue_id=issue.id) }}" method="POST" enctype="multipart/form-data">
+          <div class="form-group"><label class="form-label">Update Case Status</label><select name="status" class="form-select" id="detail-status-select" onchange="toggleDetailProof()">{% for st in STATUSES %}<option value="{{ st }}" {% if issue.status == st %}selected{% endif %}>{{ st }}</option>{% endfor %}</select></div>
+          <div class="form-group" id="detail-proof-box" style="display:{% if issue.status == 'Resolved' %}block{% else %}none{% endif %}"><label class="form-label">Proof-of-Resolution Photo</label><input type="file" name="resolution_photo" accept="image/*" class="form-control"></div>
+          <div class="form-group"><label class="form-label">Official Note</label><textarea name="note" class="form-control" rows="3" placeholder="Inspection, action taken, next step..."></textarea></div>
+          <button type="submit" class="btn btn-primary">Submit Update & Notify Participants</button>
+        </form>
+      </div>
+    {% endif %}
+
+  <!-- Right Side: Location Map & Metadata -->
+  <div>
+    
+    <!-- Location & Geotag Card -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <h3 class="card-title">📍 Location Details</h3>
+      
+      <div style="font-size: 0.95rem; font-weight: 700; color: var(--slate-900); margin-bottom: 0.25rem;">
+        {{ issue.city_town }}, {{ issue.district }}
+      </div>
+      <div style="font-size: 0.85rem; color: var(--slate-600); margin-bottom: 0.75rem;">
+        State: <strong>{{ issue.state }}</strong>
+        {% if issue.locality_address %}<br>Address: {{ issue.locality_address }}{% endif %}
+      </div>
+
+      <div id="detail-mini-map" style="height: 220px; width: 100%; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); margin-bottom: 0.75rem;"></div>
+
+      <div style="font-size: 0.78rem; color: var(--slate-500); font-family: monospace;">
+        Coordinates: {{ issue.latitude }}, {{ issue.longitude }}
+      </div>
+    </div>
+
+    <!-- Assigned Officer Card -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <h3 class="card-title">👷 Designated Personnel</h3>
+      {% if issue.assignee %}
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <div class="user-avatar" style="width: 40px; height: 40px; font-size: 1.1rem;">
+            {{ issue.assignee.name[0] | upper }}
+          </div>
+          <div>
+            <strong style="color: var(--slate-900); font-size: 0.95rem; display: block;">{{ issue.assignee.name }}</strong>
+            <span style="font-size: 0.82rem; color: var(--slate-500);">{{ issue.assignee.department or 'Field Worker' }}</span>
+          </div>
+        </div>
+      {% else %}
+        <p style="font-size: 0.88rem; color: var(--slate-500);">
+          Pending assignment to zonal worker.
+        </p>
+      {% endif %}
+    </div>
+
+    {% if assignments %}
+      <div class="card">
+        <h3 class="card-title">👥 Assigned Staff</h3>
+        <div style="display:flex;flex-direction:column;gap:.6rem">
+        {% for a in assignments %}
+          <div style="padding:.7rem;border:1px solid var(--border-subtle);border-radius:var(--radius-md);display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap">
+            <div><strong>{{ a.user.name }}</strong> <span class="badge">{{ a.user.role|title }}</span><div style="font-size:.8rem;color:var(--slate-500)">{{ a.user.phone or 'No phone' }} · {{ a.user.email }} · {{ a.user.city_town or a.user.district or 'Location not provided' }}</div></div>
+            <span class="badge">{{ a.status|title }}</span>
+          </div>
+        {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Similar Area Issues -->
+    {% if nearby_issues %}
+      <div class="card">
+        <h3 class="card-title">🏘️ Other Issues in {{ issue.city_town }}</h3>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          {% for n in nearby_issues %}
+            <a href="{{ url_for('issue_detail', issue_id=n.id) }}" style="display: block; padding: 0.6rem; border-radius: var(--radius-md); background: var(--slate-50); border: 1px solid var(--border-subtle);">
+              <div style="font-size: 0.85rem; font-weight: 700; color: var(--slate-800);">{{ n.title }}</div>
+              <div style="font-size: 0.75rem; color: var(--slate-500); display: flex; justify-content: space-between; margin-top: 0.2rem;">
+                <span>{{ n.case_code }} &bull; {{ n.category }}</span>
+                <span class="badge badge-{{ n.status | lower | replace(' ', '') }}" style="font-size: 0.65rem;">{{ n.status }}</span>
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const lat = {{ issue.latitude }};
+    const lng = {{ issue.longitude }};
+    const map = L.map("detail-mini-map").setView([lat, lng], 14);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap",
+    }).addTo(map);
+
+    const marker = L.marker([lat, lng]).addTo(map);
+    marker.bindPopup("<b>{{ issue.case_code }}</b><br>{{ issue.title }}").openPopup();
+  });
+
+  function toggleDetailProof() {
+    const st = document.getElementById("detail-status-select").value;
+    const box = document.getElementById("detail-proof-box");
+    if (box) {
+      box.style.display = (st === "Resolved") ? "block" : "none";
+    }
+  }
+
+  function toggleWorkerDetailProof() {
+    const st = document.getElementById("worker-detail-status-select").value;
+    const box = document.getElementById("worker-detail-proof-box");
+    if (box) {
+      box.style.display = (st === "Resolved") ? "block" : "none";
+    }
+  }
+</script>
+{% endblock %}

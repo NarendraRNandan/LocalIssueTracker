@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Admin Governance • CivicTrack{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem">
+  <div><h1 style="font-size:1.8rem;font-weight:800">Admin Governance & Case Control</h1><p style="color:var(--slate-500)">Admin has full application control. Only authority accounts require verification; citizens and workers do not.</p></div>
+  <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Open All Cases</a>
+</div>
+<div class="card" style="padding:1rem;margin-bottom:1rem"><b>Verification policy:</b> Authority = admin verified. Worker = no verification required. Citizen = immediate access.</div>
+
+<div class="card" style="padding:1rem;margin-bottom:1.5rem"><h3 class="card-title">🏛️ Authority Verification</h3>
+<div class="table-responsive"><table class="table"><thead><tr><th>Person</th><th>Contact</th><th>Department</th><th>Jurisdiction</th><th>Status</th><th>Action</th></tr></thead><tbody>
+{% for user in authorities %}<tr><td><b>{{ user.name }}</b></td><td>{{ user.email }}<div style="font-size:.75rem;color:var(--slate-500)">{{ user.phone or 'No phone' }}</div></td><td>{{ user.department or '-' }}</td><td>{{ user.city_town or '-' }}, {{ user.district or '-' }}, {{ user.state or '-' }}</td><td>{% if user.is_verified %}<span class="badge badge-resolved">Verified</span>{% else %}<span class="badge badge-reported">Pending</span>{% endif %}</td><td><form method="POST" action="{{ url_for('verify_user',user_id=user.id) }}"><button class="btn btn-sm {% if user.is_verified %}btn-secondary{% else %}btn-primary{% endif %}">{% if user.is_verified %}Revoke{% else %}Approve Authority{% endif %}</button></form></td></tr>{% else %}<tr><td colspan="6" style="text-align:center;padding:2rem">No authority accounts.</td></tr>{% endfor %}
+</tbody></table></div></div>
+
+<div class="card" style="padding:1rem;margin-bottom:1.5rem"><h3 class="card-title">👷 Worker Directory</h3><p style="color:var(--slate-500);font-size:.88rem">Workers do not require admin verification. Their location controls which local work can be assigned.</p>
+<div class="table-responsive"><table class="table"><thead><tr><th>Name</th><th>Contact</th><th>Department</th><th>Location</th><th>Access</th></tr></thead><tbody>
+{% for user in workers %}<tr><td><b>{{ user.name }}</b></td><td>{{ user.email }}<div>{{ user.phone or 'No phone' }}</div></td><td>{{ user.department or '-' }}</td><td>{{ user.city_town or '-' }}, {{ user.district or '-' }}, {{ user.state or '-' }}</td><td><span class="badge badge-resolved">Active</span></td></tr>{% else %}<tr><td colspan="5" style="text-align:center;padding:2rem">No workers registered.</td></tr>{% endfor %}
+</tbody></table></div></div>
+
+<div class="card" style="padding:1rem"><h3 class="card-title">🗂️ Application Management</h3>
+<div class="table-responsive"><table class="table"><thead><tr><th>Case</th><th>Issue</th><th>Location</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+{% for issue in active_issues %}<tr><td><b>{{ issue.case_code }}</b><div style="font-size:.72rem;color:var(--slate-500)">{{ issue.created_at.strftime('%d %b %Y') }}</div></td><td><b>{{ issue.title }}</b><div style="font-size:.76rem">{{ issue.category }} · {{ issue.priority }}</div></td><td>{{ issue.city_town }}, {{ issue.district }}<div style="font-size:.72rem">{{ issue.state }}</div></td><td><span class="badge badge-{{ issue.status|lower|replace(' ','') }}">{{ issue.status }}</span></td><td><div style="display:flex;gap:.35rem;flex-wrap:wrap"><a class="btn btn-sm btn-secondary" href="{{ url_for('issue_detail',issue_id=issue.id) }}">View</a><a class="btn btn-sm btn-primary" href="{{ url_for('admin_edit_issue',issue_id=issue.id) }}">Edit</a><form method="POST" action="{{ url_for('admin_cancel_issue',issue_id=issue.id) }}" onsubmit="return confirm('Cancel this application request?')"><button class="btn btn-sm btn-secondary">Cancel</button></form><form method="POST" action="{{ url_for('admin_delete_issue',issue_id=issue.id) }}" onsubmit="return confirm('Permanently delete this application? This cannot be undone.')"><button class="btn btn-sm btn-secondary">Delete</button></form></div></td></tr>{% else %}<tr><td colspan="5" style="text-align:center;padding:2rem">No active application requests.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

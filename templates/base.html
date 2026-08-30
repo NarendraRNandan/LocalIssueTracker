@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}CivicTrack &bull; AI-Powered Civic Issue Platform{% endblock %}</title>
+  <meta name="description" content="CivicTrack public issue tracking and municipal worker management platform.">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS for Maps -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="{{ url_for('index') }}" class="brand-logo">
+        <div class="brand-icon">🏛️</div>
+        <span>Civic<strong style="color: var(--primary-600);">Track</strong></span>
+      </a>
+
+      <!-- Global Search Bar in Nav -->
+      <form action="{{ url_for('index') }}" method="GET" class="nav-search-form">
+        <span class="nav-search-icon">🔍</span>
+        <input 
+          type="text" 
+          name="q" 
+          class="nav-search-input" 
+          data-i18n-placeholder="searchIssuesPlaceholder"
+          placeholder="Search issues, case codes, localities..."
+          value="{{ request.args.get('q', '') }}"
+        >
+      </form>
+
+      <!-- Navigation Links -->
+      <ul class="nav-menu">
+        <li>
+          <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" data-i18n="navExplore">
+            Explore Issues
+          </a>
+        </li>
+        {% if not current_user.is_authenticated or current_user.role == 'citizen' %}
+        <li>
+          <a href="{{ url_for('report_issue') }}" class="nav-link {% if request.endpoint == 'report_issue' %}active{% endif %}" style="font-weight: 700; color: var(--primary-600);">➕ Report Issue</a>
+        </li>
+        {% endif %}
+
+        {% if current_user.is_authenticated %}
+          {% if current_user.is_admin %}
+            <li>
+              <a href="{{ url_for('admin_panel') }}" class="nav-link {% if request.endpoint == 'admin_panel' %}active{% endif %}" data-i18n="navAdmin">
+                ⚙️ Admin
+              </a>
+            </li>
+          {% elif current_user.role == 'worker' %}
+            <li><a href="{{ url_for('dashboard') }}" class="nav-link">🛠️ My Work</a></li>
+          {% elif current_user.is_authority %}
+            <li><a href="{{ url_for('dashboard') }}" class="nav-link">⚙️ Authority Queue</a></li>
+            <li><a href="{{ url_for('authority_history') }}" class="nav-link">📚 History</a></li>
+          {% else %}
+            <li><a href="{{ url_for('my_reports') }}" class="nav-link">📋 My Active Reports</a></li>
+            <li><a href="{{ url_for('client_history') }}" class="nav-link">📚 My History</a></li>
+          {% endif %}
+
+          <li>
+            <a href="{{ url_for('notifications') }}" class="nav-link {% if request.endpoint == 'notifications' %}active{% endif %}" data-i18n="notifications">
+              🔔 Notifications
+              {% if unread_notifications_count > 0 %}
+                <span class="notification-badge">{{ unread_notifications_count }}</span>
+              {% endif %}
+            </a>
+          </li>
+
+          <li>
+            <div class="user-pill">
+              {% if current_user.profile_photo %}
+                <img src="{{ url_for('static', filename='uploads/' + current_user.profile_photo) }}" alt="{{ current_user.name }}" class="user-avatar small-user-avatar">
+              {% else %}
+                <span class="user-avatar">{{ current_user.name[0] | upper }}</span>
+              {% endif %}
+              <span>{{ current_user.name }}</span>
+              <span class="badge {% if current_user.role == 'worker' %}badge-acknowledged{% elif current_user.is_admin %}badge-priority-urgent{% else %}badge-acknowledged{% endif %}" style="font-size: 0.68rem;">
+                {{ current_user.role }}
+              </span>
+            </div>
+          </li>
+
+          <li>
+            <a href="{{ url_for('logout') }}" class="btn btn-sm btn-secondary" data-i18n="navSignOut">
+              Sign Out
+            </a>
+          </li>
+        {% else %}
+          <li>
+            <a href="{{ url_for('login') }}" class="nav-link {% if request.endpoint == 'login' %}active{% endif %}" data-i18n="navSignIn">
+              Sign In
+            </a>
+          </li>
+          <li>
+            <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm" data-i18n="navCreateAccount">
+              Create Account
+            </a>
+          </li>
+        {% endif %}
+
+        <li>
+          <div class="lang-switcher" aria-label="Language selector">
+            <button type="button" class="lang-btn active" data-lang="en">EN</button>
+            <button type="button" class="lang-btn" data-lang="hi">हिं</button>
+            <button type="button" class="lang-btn" data-lang="kn">ಕನ</button>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Flash Notifications -->
+  <div class="flash-container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }}">
+            <span>{{ message }}</span>
+            <button onclick="this.parentElement.remove()" style="background: none; border: none; font-size: 1.1rem; cursor: pointer; color: inherit;">&times;</button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+  </div>
+
+  <!-- Main View Block -->
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <button type="button" class="floating-back-btn" onclick="history.back()">← Back</button>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div>
+        <strong>CivicTrack &bull; WorkersHub Platform</strong> &copy; {{ current_year }}. AI-Powered Citizen Grievance Redressal System.
+      </div>
+      <div style="display: flex; gap: 1.5rem;">
+        <a href="{{ url_for('index') }}" data-i18n="publicMap">Public Map</a>
+        <a href="{{ url_for('report_issue') }}" data-i18n="submitComplaint">Submit Complaint</a>
+        <a href="{{ url_for('login') }}" data-i18n="officialPortal">Official Portal</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Main JS -->
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

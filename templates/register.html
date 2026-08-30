@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}Create Account &bull; CivicTrack{% endblock %}
+
+{% block content %}
+<div class="auth-split-wrapper" style="margin: -1.5rem; border-radius: var(--radius-xl); overflow: hidden; border: 1px solid var(--border-subtle); box-shadow: var(--shadow-md);">
+  
+  <!-- Left Presentation Sidebar -->
+  <div class="auth-sidebar">
+    <div class="auth-sidebar-content">
+      <div class="auth-brand">
+        <span style="font-size: 2rem;">🏛️</span>
+        <span>Join CivicTrack</span>
+      </div>
+
+      <h2 class="auth-sidebar-heading">
+        Take Action for Your Neighborhood.
+      </h2>
+
+      <p class="auth-sidebar-subtext">
+        Join thousands of active citizens and municipal officials making Indian cities cleaner, safer, and better managed.
+      </p>
+
+      <ul class="auth-features-list">
+        <li class="auth-feature-item">
+          <div class="auth-feature-icon">📢</div>
+          <div>
+            <strong style="color: #ffffff; font-size: 0.95rem;">Instant Issue Logging</strong>
+            <p style="color: #94a3b8; font-size: 0.85rem;">Capture geotagged photos and track official status.</p>
+          </div>
+        </li>
+        <li class="auth-feature-item">
+          <div class="auth-feature-icon">🛡️</div>
+          <div>
+            <strong style="color: #ffffff; font-size: 0.95rem;">Official Redressal</strong>
+            <p style="color: #94a3b8; font-size: 0.85rem;">Direct dispatch to designated zonal engineers and workers.</p>
+          </div>
+        </li>
+        <li class="auth-feature-item">
+          <div class="auth-feature-icon">🔔</div>
+          <div>
+            <strong style="color: #ffffff; font-size: 0.95rem;">Transparent Notifications</strong>
+            <p style="color: #94a3b8; font-size: 0.85rem;">Get notified as work is inspected, ongoing, and completed.</p>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <div style="font-size: 0.8rem; color: #64748b; margin-top: 2rem;">
+      Unified Civic Redressal Network &copy; {{ current_year }}
+    </div>
+  </div>
+
+  <!-- Right Registration Form -->
+  <div class="auth-form-container" style="max-width: 600px; padding: 2.5rem 3.5rem;">
+    <div class="auth-header">
+      <h2 class="auth-title">Create an Account</h2>
+      <p class="auth-subtitle">Register as a Citizen, Worker or Municipal Authority.</p>
+    </div>
+
+    <form method="POST" action="{{ url_for('register') }}">
+      
+      <!-- Role Toggle -->
+      <div class="form-group" style="margin-bottom: 1.25rem;">
+        <label class="form-label">Select Account Role</label>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem;">
+          <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); cursor: pointer; background: #fff;">
+            <input type="radio" name="role" value="citizen" checked onchange="toggleAuthorityFields()">
+            <div>
+              <strong style="display: block; font-size: 0.9rem;">Citizen</strong>
+              <span style="font-size: 0.75rem; color: var(--slate-500);">Report</span>
+            </div>
+          </label>
+
+          <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); cursor: pointer; background: #fff;">
+            <input type="radio" name="role" value="authority" onchange="toggleAuthorityFields()">
+            <div>
+              <strong style="display: block; font-size: 0.9rem;">Authority</strong>
+              <span style="font-size: 0.75rem; color: var(--slate-500);">Manage</span>
+            </div>
+          </label>
+
+          <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); cursor: pointer; background: #fff;">
+            <input type="radio" name="role" value="worker" onchange="toggleAuthorityFields()">
+            <div>
+              <strong style="display: block; font-size: 0.9rem;">Worker</strong>
+              <span style="font-size: 0.75rem; color: var(--slate-500);">Field work</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Full Name -->
+      <div class="form-group" style="margin-bottom: 1.1rem;">
+        <label class="form-label" for="reg-name">Full Name</label>
+        <input 
+          type="text" 
+          id="reg-name" 
+          name="name" 
+          class="form-control" 
+          placeholder="e.g. Priya Patel" 
+          required
+        >
+      </div>
+
+      <!-- Email & Phone in a row -->
+      <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 0.85rem; margin-bottom: 1.1rem;">
+        <div class="form-group">
+          <label class="form-label" for="reg-email">Email Address</label>
+          <input 
+            type="email" 
+            id="reg-email" 
+            name="email" 
+            class="form-control" 
+            placeholder="priya@example.com" 
+            required
+          >
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="reg-phone">Phone Number</label>
+          <input 
+            type="tel" 
+            id="reg-phone" 
+            name="phone" 
+            class="form-control" 
+            placeholder="+91 98450..."
+          >
+        </div>
+      </div>
+
+      <!-- Password -->
+      <div class="form-group" style="margin-bottom: 1.1rem;">
+        <label class="form-label" for="reg-password">Password</label>
+        <input 
+          type="password" 
+          id="reg-password" 
+          name="password" 
+          class="form-control" 
+          placeholder="At least 6 characters" 
+          required
+        >
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1.1rem;">
+        <label class="form-label" for="profile-photo">Profile Photo</label>
+        <input type="file" id="profile-photo" name="profile_photo" accept="image/*" class="form-control">
+      </div>
+
+      <!-- Authority Specific Cascading Location & Department -->
+      <div id="authority-fields-section" style="display: none; background: var(--slate-50); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.25rem;">
+        <div style="font-size: 0.85rem; font-weight: 700; color: var(--primary-700); margin-bottom: 0.75rem;">
+          🏛️ Jurisdiction & Municipal Department
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0.85rem;">
+          <label class="form-label">Department / Agency</label>
+          <input 
+            type="text" 
+            name="department" 
+            class="form-control" 
+            placeholder="e.g. Municipal Public Works, Sanitation, Electricity"
+          >
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.85rem;">
+          <div class="form-group">
+            <label class="form-label">State / UT</label>
+            <select name="state" class="form-select cascading-state">
+              <option value="">Select State</option>
+              {% for st in states %}
+                <option value="{{ st }}">{{ st }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">District</label>
+            <select name="district" class="form-select cascading-district">
+              <option value="">Select District</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">City / Town / Zonal Ward</label>
+          <select name="city_town" class="form-select cascading-city">
+            <option value="">Select City / Town</option>
+          </select>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block btn-lg">
+        Complete Registration &rarr;
+      </button>
+
+      <div style="margin-top: 1.25rem; text-align: center; font-size: 0.88rem; color: var(--slate-500);">
+        Already registered? 
+        <a href="{{ url_for('login') }}" style="font-weight: 700; color: var(--primary-600);">Sign in here</a>
+      </div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function toggleAuthorityFields() {
+    const selectedRole = document.querySelector('input[name="role"]:checked').value;
+    const isAuth = selectedRole !== 'citizen';
+    document.getElementById('authority-fields-section').style.display = isAuth ? 'block' : 'none';
+  }
+</script>
+{% endblock %}

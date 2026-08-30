@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}My Reported Issues &bull; CivicTrack{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+  <div>
+    <h1 style="font-size: 1.8rem; font-weight: 800; color: var(--slate-900);">My Civic Complaints</h1>
+    <p style="color: var(--slate-500); font-size: 0.92rem;">
+      Track the live resolution status and official action history for issues you have registered.
+    </p>
+  </div>
+
+  <a href="{{ url_for('report_issue') }}" class="btn btn-primary">
+    ➕ File New Complaint
+  </a>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-card">
+  <form action="{{ url_for('my_reports') }}" method="GET" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+    <div style="flex: 1; min-width: 200px;">
+      <input type="text" name="q" class="form-control" placeholder="Search case ID or keywords..." value="{{ search_q }}">
+    </div>
+
+    <div style="width: 180px;">
+      <select name="status" class="form-select" onchange="this.form.submit()">
+        <option value="all">All Statuses</option>
+        {% for st in STATUSES %}
+          <option value="{{ st }}" {% if current_status == st %}selected{% endif %}>{{ st }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Search</button>
+    <a href="{{ url_for('my_reports') }}" class="btn btn-secondary">Reset</a>
+  </form>
+</div>
+
+<!-- List of Reports -->
+<div style="display: flex; flex-direction: column; gap: 1.25rem;">
+  {% if issues %}
+    {% for issue in issues %}
+      <div class="card" style="padding: 1.5rem; transition: all 0.2s ease;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem;">
+              <span style="font-family: monospace; font-weight: 700; color: var(--primary-700); font-size: 0.95rem;">{{ issue.case_code }}</span>
+              <span class="badge badge-{{ issue.status | lower | replace(' ', '') }}">{{ issue.status }}</span>
+              <span class="badge badge-priority-{{ issue.priority | lower }}">{{ issue.priority }}</span>
+            </div>
+            <h3 style="font-size: 1.2rem; font-weight: 700; color: var(--slate-900);">
+              <a href="{{ url_for('issue_detail', issue_id=issue.id) }}">{{ issue.title }}</a>
+            </h3>
+            <div style="font-size: 0.84rem; color: var(--slate-500); margin-top: 0.25rem;">
+              📍 {{ issue.locality_address or issue.city_town }}, {{ issue.district }}, {{ issue.state }} &bull; Logged {{ issue.time_ago_str() }}
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.6rem;">
+            <div class="upvote-chip" style="font-size: 0.88rem;">
+              <span>👍</span>
+              <span>{{ issue.upvote_count }} Upvotes</span>
+            </div>
+            <a href="{{ url_for('issue_detail', issue_id=issue.id) }}" class="btn btn-sm btn-secondary">
+              View Audit Dossier &rarr;
+            </a>
+          </div>
+        </div>
+
+        <!-- Progress Step Bar -->
+        <div style="background: var(--slate-100); border-radius: var(--radius-md); padding: 1rem 1.25rem; margin-top: 0.5rem;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; color: var(--slate-600); position: relative;">
+            
+            <div style="text-align: center; color: var(--primary-700);">
+              <div style="width: 24px; height: 24px; border-radius: 50%; background: var(--primary-600); color: #fff; margin: 0 auto 4px; display: flex; align-items: center; justify-content: center;">✓</div>
+              <span>1. Reported</span>
+            </div>
+
+            <div style="text-align: center; color: {% if issue.status in ['Acknowledged', 'In Progress', 'Resolved'] %}var(--primary-700){% else %}var(--slate-400){% endif %};">
+              <div style="width: 24px; height: 24px; border-radius: 50%; background: {% if issue.status in ['Acknowledged', 'In Progress', 'Resolved'] %}var(--primary-600){% else %}var(--slate-300){% endif %}; color: #fff; margin: 0 auto 4px; display: flex; align-items: center; justify-content: center;">
+                {% if issue.status in ['Acknowledged', 'In Progress', 'Resolved'] %}✓{% else %}2{% endif %}
+              </div>
+              <span>2. Acknowledged</span>
+            </div>
+
+            <div style="text-align: center; color: {% if issue.status in ['In Progress', 'Resolved'] %}var(--warning-text){% else %}var(--slate-400){% endif %};">
+              <div style="width: 24px; height: 24px; border-radius: 50%; background: {% if issue.status in ['In Progress', 'Resolved'] %}var(--warning-solid){% else %}var(--slate-300){% endif %}; color: #fff; margin: 0 auto 4px; display: flex; align-items: center; justify-content: center;">
+                {% if issue.status in ['In Progress', 'Resolved'] %}🛠️{% else %}3{% endif %}
+              </div>
+              <span>3. In Progress</span>
+            </div>
+
+            <div style="text-align: center; color: {% if issue.status == 'Resolved' %}var(--success-text){% else %}var(--slate-400){% endif %};">
+              <div style="width: 24px; height: 24px; border-radius: 50%; background: {% if issue.status == 'Resolved' %}var(--success-solid){% else %}var(--slate-300){% endif %}; color: #fff; margin: 0 auto 4px; display: flex; align-items: center; justify-content: center;">
+                {% if issue.status == 'Resolved' %}✅{% else %}4{% endif %}
+              </div>
+              <span>4. Resolved</span>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="card" style="text-align: center; padding: 3rem;">
+      <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📋</div>
+      <h3 style="font-size: 1.2rem; font-weight: 700; color: var(--slate-800);">No complaints filed yet</h3>
+      <p style="color: var(--slate-500); margin-top: 0.5rem;">Help improve your city by reporting any potholes, garbage, or broken infrastructure you encounter.</p>
+      <a href="{{ url_for('report_issue') }}" class="btn btn-primary" style="margin-top: 1.25rem;">Report an Issue Now</a>
+    </div>
+  {% endif %}
+</div>
+
+{% endblock %}

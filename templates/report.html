@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}Report a Civic Issue &bull; CivicTrack{% endblock %}
+
+{% block content %}
+<div class="report-layout">
+  
+  <!-- Left Side: Report Form -->
+  <div class="card">
+    <div class="card-title">
+      <span>📢</span>
+      <span>Submit a Public Civic Report</span>
+    </div>
+    <p style="color: var(--slate-600); font-size: 0.9rem; margin-bottom: 1.5rem;">
+      Provide details of the problem. Our integrated AI will automatically analyze your description to classify category, estimate urgency, and check for nearby duplicates.
+    </p>
+
+    <!-- AI Suggestion Box (Dynamic) -->
+    <div id="ai-suggestion-box" class="ai-suggestion-box" style="display: none;">
+      <div class="ai-sparkle-icon">✨</div>
+      <div style="flex: 1;">
+        <div class="ai-suggestion-title">AI Recommendation Engine</div>
+        <div class="ai-suggestion-text">
+          Suggested Category: <strong id="ai-suggested-category" style="color: #4c1d95;">Roads & Potholes</strong> &bull; 
+          Priority: <strong id="ai-suggested-priority" style="color: #4c1d95;">Medium</strong>
+        </div>
+      </div>
+      <button type="button" id="ai-apply-btn" class="btn btn-sm btn-primary" style="background: var(--ai-purple-solid); border: none;">
+        Apply Suggestion
+      </button>
+    </div>
+
+    <!-- Duplicate Detection Results Box (Dynamic) -->
+    <div id="duplicate-results-container" style="display: none;"></div>
+
+    <form method="POST" action="{{ url_for('report_issue') }}" enctype="multipart/form-data" class="report-form">
+      
+      <!-- Issue Title -->
+      <div class="form-group" style="margin-bottom: 1.25rem;">
+        <label class="form-label" for="report-title">Issue Title *</label>
+        <input 
+          type="text" 
+          id="report-title" 
+          name="title" 
+          class="form-control" 
+          placeholder="e.g. Deep pothole on Main Road near City Hospital" 
+          required
+        >
+      </div>
+
+      <!-- Description -->
+      <div class="form-group" style="margin-bottom: 1.25rem;">
+        <label class="form-label" for="report-desc">Description of the Problem *</label>
+        <textarea 
+          id="report-desc" 
+          name="description" 
+          class="form-control" 
+          rows="4" 
+          placeholder="Describe the issue in detail (e.g. size of crater, hazards, how long it has been unresolved, impact on traffic/safety)..." 
+          required
+        ></textarea>
+      </div>
+
+      <!-- Category & Priority Row -->
+      <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+        <div class="form-group">
+          <label class="form-label" for="report-category">Issue Category *</label>
+          <select id="report-category" name="category" class="form-select" required>
+            <option value="">Select Category</option>
+            {% for cat in CATEGORIES %}
+              <option value="{{ cat }}">{{ cat }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="report-priority">Urgency / Priority</label>
+          <select id="report-priority" name="priority" class="form-select">
+            {% for prio in PRIORITIES %}
+              <option value="{{ prio }}" {% if prio == 'Medium' %}selected{% endif %}>{{ prio }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Location Cascading Selects -->
+      <div style="background: var(--slate-50); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1.25rem;">
+        <div style="font-weight: 700; font-size: 0.95rem; color: var(--slate-800); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.4rem;">
+          <span>📍</span>
+          <span>Geographic Location Hierarchy</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem; margin-bottom: 0.85rem;">
+          <div class="form-group">
+            <label class="form-label">State / UT *</label>
+            <select id="report-state" name="state" class="form-select cascading-state" required>
+              <option value="">Select State</option>
+              {% for st in states %}
+                <option value="{{ st }}">{{ st }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">District *</label>
+            <select id="report-district" name="district" class="form-select cascading-district" required>
+              <option value="">Select District</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">City / Town *</label>
+            <select id="report-city" name="city_town" class="form-select cascading-city" required>
+              <option value="">Select City / Town</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Street / Landmark Address</label>
+          <input 
+            type="text" 
+            name="locality_address" 
+            class="form-control" 
+            placeholder="e.g. 4th Cross Road, Near Suburb Bus Stand"
+          >
+        </div>
+      </div>
+
+      <!-- Interactive Pin-Drop Map -->
+      <div class="form-group" style="margin-bottom: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <label class="form-label">Pinpoint Exact GPS Location on Map</label>
+          <button type="button" id="btn-gps-location" class="btn btn-sm btn-secondary" style="font-size: 0.78rem;">
+            📍 Use My GPS Location
+          </button>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--slate-500); margin-bottom: 0.4rem;">
+          Click on the map or use GPS. The portal will try to identify State, District and City/Town automatically; you can correct them if needed.
+        </p>
+        
+        <div id="report-map"></div>
+
+        <input type="hidden" id="report-lat" name="latitude" value="12.3051">
+        <input type="hidden" id="report-lng" name="longitude" value="76.6552">
+      </div>
+
+      <!-- Photo Upload -->
+      <div class="form-group" style="margin-bottom: 1.5rem;">
+        <label class="form-label">Upload Photo Evidence (Optional but Recommended)</label>
+        <input type="file" name="photo" accept="image/*" class="form-control">
+        <div class="photo-preview-target"></div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block btn-lg">
+        Submit Report to Municipal Authorities &rarr;
+      </button>
+
+    </form>
+  </div>
+
+  <!-- Right Side: Tips & Process Info -->
+  <div>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--slate-900); margin-bottom: 0.85rem; display: flex; align-items: center; gap: 0.4rem;">
+        <span>💡</span>
+        <span>Tips for Effective Reports</span>
+      </h3>
+      <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.85rem; font-size: 0.88rem; color: var(--slate-600);">
+        <li style="display: flex; gap: 0.5rem;">
+          <span style="color: var(--primary-600); font-weight: 700;">1.</span>
+          <span><strong>Be specific:</strong> Include nearby landmarks, shop names, or street poles to help workers locate the spot.</span>
+        </li>
+        <li style="display: flex; gap: 0.5rem;">
+          <span style="color: var(--primary-600); font-weight: 700;">2.</span>
+          <span><strong>Clear photos:</strong> A wide-angle photo showing the surrounding area speeds up verification by up to 60%.</span>
+        </li>
+        <li style="display: flex; gap: 0.5rem;">
+          <span style="color: var(--primary-600); font-weight: 700;">3.</span>
+          <span><strong>Avoid duplicates:</strong> Check the AI duplicate suggestions above to upvote existing issues instead.</span>
+        </li>
+      </ul>
+    </div>
+
+    <div class="card" style="background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%); border-color: #c7d2fe;">
+      <h3 style="font-size: 1rem; font-weight: 700; color: var(--primary-900); margin-bottom: 0.5rem;">
+        🛡️ Civic Redressal SLA Guarantee
+      </h3>
+      <p style="font-size: 0.85rem; color: var(--slate-600); line-height: 1.5;">
+        Every case submitted generates a unique verifiable Case Code. Assigned zonal officers are notified within minutes.
+      </p>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

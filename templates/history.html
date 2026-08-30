@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} • CivicTrack{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem"><div><h1 style="font-size:1.8rem;font-weight:800">{{ title }}</h1><p style="color:var(--slate-500)">Completed cases leave the active queue and remain available here as an immutable audit trail.</p></div><a href="{{ url_for('my_reports') if client_history else url_for('dashboard') }}" class="btn btn-secondary">← Active Queue</a></div>
+<div class="table-responsive"><table class="table"><thead><tr><th>Case</th><th>Issue</th><th>Location</th><th>Completed</th><th>Upvotes</th><th>Details</th></tr></thead><tbody>
+{% for issue in issues %}<tr><td><b>{{ issue.case_code }}</b></td><td><b>{{ issue.title }}</b><div style="font-size:.78rem;color:var(--slate-500)">{{ issue.category }} · {{ issue.priority }}</div></td><td>{{ issue.locality_address or issue.city_town }}, {{ issue.district }}</td><td>{{ issue.resolved_at.strftime('%d %b %Y, %I:%M %p') if issue.resolved_at else issue.updated_at.strftime('%d %b %Y') }}</td><td>👍 {{ issue.upvote_count }}</td><td><a class="btn btn-sm btn-secondary" href="{{ url_for('issue_detail',issue_id=issue.id) }}">Audit</a></td></tr>{% else %}<tr><td colspan="6" style="text-align:center;padding:3rem;color:var(--slate-500)">No completed cases yet.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

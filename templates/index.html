@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+
+{% block title %}Explore Public Issues &bull; CivicTrack{% endblock %}
+
+{% block content %}
+
+<!-- Hero Banner & KPIs -->
+<section class="hero-section">
+  <div class="hero-grid">
+    <div>
+      <h1 class="hero-title">Transparent Civic Governance & Smart Issue Resolution</h1>
+      <p class="hero-subtitle">
+        Empowering citizens and municipal workers to report, track, and resolve local civic issues in real-time with AI-assisted categorization and duplicate detection.
+      </p>
+      <div class="hero-actions">
+        <a href="{{ url_for('report_issue') }}" class="btn btn-primary btn-lg" style="background: #ffffff; color: var(--slate-900); font-weight: 700;">
+          📢 Report an Issue
+        </a>
+        <a href="#explore-section" class="btn btn-secondary btn-lg" style="background: rgba(255,255,255,0.15); color: #ffffff; border-color: rgba(255,255,255,0.25);">
+          🗺️ View Live Map
+        </a>
+      </div>
+    </div>
+
+    <!-- KPI Summary Cards -->
+    <div class="hero-kpis">
+      <div class="kpi-card">
+        <span class="kpi-value">{{ stats.total }}</span>
+        <span class="kpi-label">Total Registered Issues</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-value" style="color: #60a5fa;">{{ stats.reported }}</span>
+        <span class="kpi-label">Pending Review</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-value" style="color: #fbbf24;">{{ stats.in_progress }}</span>
+        <span class="kpi-label">Under Active Work</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-value" style="color: #34d399;">{{ stats.resolution_rate }}%</span>
+        <span class="kpi-label">Overall Resolution Rate</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Filter & Cascading Location Toolbar -->
+<section id="explore-section" class="filter-card">
+  <form action="{{ url_for('index') }}" method="GET" class="filter-grid">
+    
+    <!-- Keyword Search -->
+    <div class="form-group" style="grid-column: span 2;">
+      <label class="form-label">Search Query</label>
+      <input 
+        type="text" 
+        name="q" 
+        class="form-control" 
+        placeholder="Case code, title, or landmark..."
+        value="{{ selected_q }}"
+      >
+    </div>
+
+    <!-- State Cascading Filter -->
+    <div class="form-group">
+      <label class="form-label">State / UT</label>
+      <select name="state" class="form-select cascading-state">
+        <option value="all">All States</option>
+        {% for st in states %}
+          <option value="{{ st }}" {% if selected_state == st %}selected{% endif %}>{{ st }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- District Cascading Filter -->
+    <div class="form-group">
+      <label class="form-label">District</label>
+      <select name="district" class="form-select cascading-district">
+        <option value="all">All Districts</option>
+        {% if selected_district and selected_district != 'all' %}
+          <option value="{{ selected_district }}" selected>{{ selected_district }}</option>
+        {% endif %}
+      </select>
+    </div>
+
+    <!-- City / Town Cascading Filter -->
+    <div class="form-group">
+      <label class="form-label">City / Town</label>
+      <select name="city_town" class="form-select cascading-city">
+        <option value="all">All Cities / Towns</option>
+        {% if selected_city and selected_city != 'all' %}
+          <option value="{{ selected_city }}" selected>{{ selected_city }}</option>
+        {% endif %}
+      </select>
+    </div>
+
+    <!-- Category Filter -->
+    <div class="form-group">
+      <label class="form-label">Category</label>
+      <select name="category" class="form-select">
+        <option value="all">All Categories</option>
+        {% for cat in CATEGORIES %}
+          <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Status Filter -->
+    <div class="form-group">
+      <label class="form-label">Status</label>
+      <select name="status" class="form-select">
+        <option value="all">All Statuses</option>
+        {% for st in STATUSES %}
+          <option value="{{ st }}" {% if selected_status == st %}selected{% endif %}>{{ st }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Sort Filter -->
+    <div class="form-group">
+      <label class="form-label">Sort By</label>
+      <select name="sort" class="form-select">
+        <option value="newest" {% if selected_sort == 'newest' %}selected{% endif %}>Newest First</option>
+        <option value="upvotes" {% if selected_sort == 'upvotes' %}selected{% endif %}>Most Upvoted</option>
+        <option value="urgent" {% if selected_sort == 'urgent' %}selected{% endif %}>Urgency & Priority</option>
+      </select>
+    </div>
+
+    <!-- Actions -->
+    <div class="form-group" style="display: flex; flex-direction: row; gap: 0.5rem;">
+      <button type="submit" class="btn btn-primary" style="flex: 1;">Filter</button>
+      <a href="{{ url_for('index') }}" class="btn btn-secondary">Reset</a>
+    </div>
+
+  </form>
+</section>
+
+<!-- View Header (Map / Grid Toggle) -->
+<div class="view-header">
+  <div>
+    <h2 style="font-size: 1.35rem; font-weight: 800; color: var(--slate-900);">
+      Active Civic Cases <span style="font-size: 0.95rem; font-weight: 500; color: var(--slate-500);">({{ issues | length }} results)</span>
+    </h2>
+  </div>
+
+  <div class="view-tabs">
+    <button id="view-grid-btn" class="view-tab-btn active">
+      📑 Card Grid
+    </button>
+    <button id="view-map-btn" class="view-tab-btn">
+      🗺️ Map View
+    </button>
+  </div>
+</div>
+
+<!-- Card Grid Container -->
+<div id="grid-container" class="issues-grid">
+  {% if issues %}
+    {% for issue in issues %}
+      <div class="issue-card">
+        <div class="issue-card-thumb">
+          {% if issue.photo_filename %}
+            <img src="{{ url_for('static', filename='uploads/' + issue.photo_filename) }}" alt="{{ issue.title }}">
+          {% else %}
+            <div class="issue-card-thumb-placeholder">
+              <span>🏛️</span>
+              <span>Civic Report</span>
+            </div>
+          {% endif %}
+          
+          <div style="position: absolute; top: 10px; right: 10px; display: flex; gap: 5px;">
+            <span class="badge badge-{{ issue.status | lower | replace(' ', '') }}">
+              {{ issue.status }}
+            </span>
+          </div>
+
+          <div style="position: absolute; top: 10px; left: 10px;">
+            <span class="badge badge-priority-{{ issue.priority | lower }}">
+              {{ issue.priority }}
+            </span>
+          </div>
+        </div>
+
+        <div class="issue-card-body">
+          <div class="issue-meta-row">
+            <span class="issue-case-code">{{ issue.case_code }}</span>
+            <span style="font-size: 0.78rem; color: var(--slate-500);">{{ issue.time_ago_str() }}</span>
+          </div>
+
+          <h3 class="issue-title">
+            <a href="{{ url_for('issue_detail', issue_id=issue.id) }}">
+              {{ issue.title }}
+            </a>
+          </h3>
+
+          <p class="issue-desc">{{ issue.description }}</p>
+
+          <div class="issue-location-tag">
+            <span>📍</span>
+            <span>{{ issue.city_town }}, {{ issue.district }}</span>
+          </div>
+
+          <!-- AI Tag Pill -->
+          {% if issue.ai_suggested_category %}
+            <div style="margin-bottom: 0.85rem;">
+              <span class="badge badge-ai">
+                ✨ AI Tag: {{ issue.category }}
+              </span>
+            </div>
+          {% endif %}
+
+          <div class="issue-card-footer">
+            <div class="upvote-chip">
+              <span>👍</span>
+              <span>{{ issue.upvote_count }} Upvotes</span>
+            </div>
+
+            <a href="{{ url_for('issue_detail', issue_id=issue.id) }}" class="btn btn-sm btn-secondary">
+              View Case &rarr;
+            </a>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="card" style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
+      <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">🔍</div>
+      <h3 style="font-size: 1.2rem; font-weight: 700; color: var(--slate-800);">No issues found matching the criteria</h3>
+      <p style="color: var(--slate-500); margin-top: 0.5rem;">Try adjusting your search keywords, location or category filters.</p>
+      <a href="{{ url_for('index') }}" class="btn btn-primary" style="margin-top: 1.25rem;">Reset All Filters</a>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Interactive Map Container -->
+<div id="map-container" style="display: none;"></div>
+
+{% endblock %}
