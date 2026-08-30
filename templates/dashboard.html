@@ -70,13 +70,25 @@
 <td><span class="badge badge-{{ issue.status|lower|replace(' ','') }}">{{ issue.status }}</span></td>
 <td><div style="display:flex;flex-direction:column;gap:.3rem">{% for a in issue.assignments if a.status != 'declined' and a.status != 'cancelled' %}<span style="font-size:.8rem">👤 {{ a.user.name }} <small>({{ a.user.role }}, {{ a.status }})</small></span>{% else %}<span style="font-size:.8rem;color:var(--slate-500)">Unassigned</span>{% endfor %}</div>
 <form method="POST" action="{{ url_for('assign_worker',issue_id=issue.id) }}" style="margin-top:.5rem"><select name="user_id" class="form-select" required><option value="">Select one local staff member...</option>{% for w in workers %}<option value="{{ w.id }}">{{ w.name }} · {{ w.role|title }} · {{ w.phone or 'No phone' }} · {{ w.email }} · {{ w.city_town or '-' }}, {{ w.district or '-' }}</option>{% endfor %}</select><button class="btn btn-sm btn-primary" style="margin-top:.35rem">➕ Add Member</button></form></td>
-<td><div style="display:flex;gap:.35rem;flex-wrap:wrap"><a class="btn btn-sm btn-secondary" href="{{ url_for('issue_detail',issue_id=issue.id) }}">View</a>{% if current_role == 'admin' %}<a class="btn btn-sm btn-secondary" href="{{ url_for('admin_edit_issue',issue_id=issue.id) }}">Edit</a><form method="POST" action="{{ url_for('admin_cancel_issue',issue_id=issue.id) }}" onsubmit="return confirm('Cancel this application?')"><button class="btn btn-sm btn-secondary">Cancel</button></form><form method="POST" action="{{ url_for('admin_delete_issue',issue_id=issue.id) }}" onsubmit="return confirm('Permanently delete this application?')"><button class="btn btn-sm btn-secondary">Delete</button></form>{% endif %}<a class="btn btn-sm btn-secondary" href="{{ url_for('issue_chat',issue_id=issue.id) }}">Chat</a>{% if issue.status != 'Resolved' %}<button class="btn btn-sm btn-primary" onclick="openUpdateModal('{{ issue.id }}','{{ issue.case_code }}','{{ issue.status }}','{{ current_role }}')">Update</button>{% endif %}</div></td>
+<td><div style="display:flex;gap:.35rem;flex-wrap:wrap"><a class="btn btn-sm btn-secondary" href="{{ url_for('issue_detail',issue_id=issue.id) }}">View</a>{% if current_role == 'admin' %}<a class="btn btn-sm btn-secondary" href="{{ url_for('admin_edit_issue',issue_id=issue.id) }}">Edit</a><form method="POST" action="{{ url_for('admin_cancel_issue',issue_id=issue.id) }}" onsubmit="return confirm('Cancel this application?')"><button class="btn btn-sm btn-secondary">Cancel</button></form><form method="POST" action="{{ url_for('admin_delete_issue',issue_id=issue.id) }}" onsubmit="return confirm('Permanently delete this application?')"><button class="btn btn-sm btn-secondary">Delete</button></form>{% endif %}<a class="btn btn-sm btn-secondary" href="{{ url_for('issue_chat',issue_id=issue.id) }}">Chat</a>{% if issue.status != 'Resolved' and current_role in ('authority', 'admin') %}<button class="btn btn-sm btn-primary" onclick="openUpdateModal('{{ issue.id }}','{{ issue.case_code }}','{{ issue.status }}','{{ current_role }}')">Update Status</button>{% endif %}</div></td>
+
 </tr>{% else %}<tr><td colspan="7" style="text-align:center;padding:3rem;color:var(--slate-500)">No active cases match your filters.</td></tr>{% endfor %}
 </tbody></table></div>
 <div id="status-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.65);z-index:2000;align-items:center;justify-content:center;padding:1rem"><div class="card" style="max-width:520px;width:100%"><h3 id="modal-title">Update Case</h3><form id="status-form" method="POST" enctype="multipart/form-data"><div class="form-group"><label class="form-label">New Status</label><select id="modal-status-select" name="status" class="form-select">{% for st in STATUSES %}<option value="{{ st }}">{{ st }}</option>{% endfor %}</select></div><div class="form-group"><label class="form-label">Official Note</label><textarea name="note" class="form-control" rows="4" placeholder="Action taken, inspection result, next step..."></textarea></div><div class="form-group"><label class="form-label">Proof Photo (required for Resolved)</label><input type="file" name="resolution_photo" class="form-control" accept="image/*"></div><div style="display:flex;gap:.5rem;justify-content:flex-end"><button type="button" class="btn btn-secondary" onclick="closeUpdateModal()">Cancel</button><button class="btn btn-primary">Save Update</button></div></form></div></div>
 {% endif %}
 {% endblock %}
 {% block extra_scripts %}<script>
-function openUpdateModal(id,code,status,role){if(role==='worker')return;document.getElementById('modal-title').textContent='Update '+code;document.getElementById('modal-status-select').value=status;document.getElementById('status-form').action='/dashboard/issue/'+id+'/update';document.getElementById('status-modal').style.display='flex'}
+function openUpdateModal(id,code,status,role){
+  // Workers are completely blocked from updating status
+  if(role==='worker'){
+    alert('Only authorities can change issue status. Please coordinate with your assigned authority.');
+    return;
+  }
+  document.getElementById('modal-title').textContent='Update '+code;
+  document.getElementById('modal-status-select').value=status;
+  document.getElementById('status-form').action='/dashboard/issue/'+id+'/update';
+  document.getElementById('status-modal').style.display='flex';
+}
 function closeUpdateModal(){document.getElementById('status-modal').style.display='none'}
 </script>{% endblock %}
+

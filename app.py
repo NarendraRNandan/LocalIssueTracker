@@ -817,7 +817,8 @@ def admin_panel():
     authorities = User.query.filter_by(role="authority").order_by(User.created_at.desc()).all()
     workers = User.query.filter_by(role="worker").order_by(User.created_at.desc()).all()
     active_issues = Issue.query.order_by(Issue.updated_at.asc()).all()
-    return render_template("admin_panel.html", authorities=authorities, workers=workers, active_issues=active_issues)
+    states = [r[0] for r in db.session.query(Place.state).distinct().order_by(Place.state).all()]
+    return render_template("admin_panel.html", authorities=authorities, workers=workers, active_issues=active_issues, states=states)
 
 
 @app.route("/admin/verify-user/<int:user_id>", methods=["POST"])
@@ -986,8 +987,14 @@ def authority_dashboard():
     return render_template("dashboard.html",issues=issues,stats=stats,states=states,workers=staff,current_status=status,current_category=category,current_priority=priority,current_state=current_state,current_district=current_district,current_city=current_city,current_sort=sort,search_q=q,current_role=current_user.role,date_from=date_from,date_to=date_to)
 
 @app.route("/dashboard/issue/<int:issue_id>/update", methods=["POST"])
-@authority_required
+@login_required
 def update_issue_status(issue_id):
+    # Workers are NEVER allowed to change status
+    if current_user.role == "worker":
+        flash("Workers cannot change case status. Coordinate with the assigned authority.", "warning")
+        return redirect(request.referrer or url_for("dashboard"))
+    if not current_user.is_authenticated or current_user.role not in ("authority", "admin"):
+        abort(403)
     issue=Issue.query.get_or_404(issue_id)
     if not current_user.is_admin and not (current_user.role == "authority" and current_user.is_verified and same_location(current_user, issue)):
         abort(403)
@@ -1046,8 +1053,253 @@ def assign_worker(issue_id):
 @app.route("/dashboard/issue/<int:issue_id>/worker-update", methods=["POST"])
 @login_required
 def worker_update_issue_status(issue_id):
-    flash("Workers cannot change case status. Use Accept/Cancel and coordinate with the authority.","warning")
+    flash("Workers cannot change case status. Coordinate with the assigned authority.","warning")
     return redirect(request.referrer or url_for("dashboard"))
+
+
+# =========================================================================
+# PROFILE EDIT (ALL ROLES — SELF EDIT)
+# =========================================================================
+
+@app.route("/profile/edit", methods=["GET", "POST"])
+@login_required
+def profile_edit():
+    """Self-profile edit. Authority accounts are locked after admin verification — only admin can change them."""
+    if current_user.role == "authority" and current_user.is_verified:
+        flash("Your authority profile is admin-managed. Contact the administrator to update your details.", "info")
+        return redirect(url_for("dashboard"))
+
+    all_states = [r[0] for r in db.session.query(Place.state).distinct().order_by(Place.state).all()]
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        phone = request.form.get("phone", "").strip()
+        new_password = request.form.get("new_password", "").strip()
+        confirm_password = request.form.get("confirm_password", "").strip()
+
+        if not name:
+            flash("Name is required.", "error")
+            return render_template("profile_edit.html", user=current_user, states=all_states)
+
+        current_user.name = name
+        current_user.phone = phone or None
+
+        # Citizens may also update their location
+        if current_user.role == "citizen":
+            state = request.form.get("state") or None
+            district = request.form.get("district") or None
+            city_town = request.form.get("city_town") or None
+            current_user.state = state
+            current_user.district = district
+            current_user.city_town = city_town
+
+        # Profile photo
+        photo = save_upload(request.files.get("profile_photo"))
+        if photo:
+            current_user.profile_photo = photo
+
+        # Password change
+        if new_password:
+            if new_password != confirm_password:
+                flash("Passwords do not match.", "error")
+                return render_template("profile_edit.html", user=current_user, states=all_states)
+            if len(new_password) < 6:
+                flash("Password must be at least 6 characters.", "error")
+                return render_template("profile_edit.html", user=current_user, states=all_states)
+            current_user.set_password(new_password)
+
+        db.session.commit()
+        flash("Your profile has been updated successfully.", "success")
+        if current_user.is_admin:
+            return redirect(url_for("admin_panel"))
+        if current_user.role in ("authority", "worker"):
+            return redirect(url_for("dashboard"))
+        return redirect(url_for("index"))
+
+    return render_template("profile_edit.html", user=current_user, states=all_states)
+
+
+# =========================================================================
+# ADMIN — EMPLOYEE MANAGEMENT (ADD / EDIT / DELETE / ACTIVITY)
+# =========================================================================
+
+@app.route("/admin/user/<int:user_id>/edit", methods=["GET", "POST"])
+@login_required
+@admin_required
+def admin_edit_user(user_id):
+    """Admin edits any authority or worker's profile."""
+    user = User.query.get_or_404(user_id)
+    if user.role not in ("authority", "worker"):
+        flash("Only authority and worker profiles can be edited from here.", "warning")
+        return redirect(url_for("admin_panel"))
+
+    all_states = [r[0] for r in db.session.query(Place.state).distinct().order_by(Place.state).all()]
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        phone = request.form.get("phone", "").strip()
+        department = request.form.get("department", "").strip()
+        state = request.form.get("state") or None
+        district = request.form.get("district") or None
+        city_town = request.form.get("city_town") or None
+        new_password = request.form.get("new_password", "").strip()
+        confirm_password = request.form.get("confirm_password", "").strip()
+
+        if not name:
+            flash("Name is required.", "error")
+            return render_template("admin_edit_user.html", user=user, states=all_states)
+
+        user.name = name
+        user.phone = phone or None
+        user.department = department or None
+        user.state = state
+        user.district = district
+        user.city_town = city_town
+
+        # Profile photo
+        photo = save_upload(request.files.get("profile_photo"))
+        if photo:
+            user.profile_photo = photo
+
+        # Password reset by admin
+        if new_password:
+            if new_password != confirm_password:
+                flash("Passwords do not match.", "error")
+                return render_template("admin_edit_user.html", user=user, states=all_states)
+            if len(new_password) < 6:
+                flash("Password must be at least 6 characters.", "error")
+                return render_template("admin_edit_user.html", user=user, states=all_states)
+            user.set_password(new_password)
+
+        # If location changed for an authority, cancel assignments that no longer match
+        if user.role == "authority" and (state or district or city_town):
+            for assignment in IssueAssignment.query.filter_by(user_id=user.id).filter(
+                IssueAssignment.status.in_(["pending", "accepted"])
+            ).all():
+                issue = assignment.issue
+                if not (
+                    issue.state.casefold() == (state or "").casefold() and
+                    issue.district.casefold() == (district or "").casefold() and
+                    issue.city_town.casefold() == (city_town or "").casefold()
+                ):
+                    assignment.status = "cancelled"
+                    assignment.responded_at = datetime.utcnow()
+                    notify(user.id, issue.id, "Assignment Cancelled",
+                           f"Your assignment for {issue.case_code} was cancelled because your jurisdiction was updated by admin.")
+
+        db.session.commit()
+        flash(f"{user.name}'s profile has been updated.", "success")
+        return redirect(url_for("admin_panel"))
+
+    return render_template("admin_edit_user.html", user=user, states=all_states)
+
+
+@app.route("/admin/user/add", methods=["POST"])
+@login_required
+@admin_required
+def admin_add_user():
+    """Admin creates a new authority or worker account."""
+    name = request.form.get("name", "").strip()
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "").strip()
+    role = request.form.get("role", "worker")
+    phone = request.form.get("phone", "").strip()
+    department = request.form.get("department", "").strip()
+    state = request.form.get("state") or None
+    district = request.form.get("district") or None
+    city_town = request.form.get("city_town") or None
+
+    if not name or not email or not password:
+        flash("Name, email and password are required.", "error")
+        return redirect(url_for("admin_panel"))
+
+    if role not in ("authority", "worker"):
+        flash("Role must be authority or worker.", "error")
+        return redirect(url_for("admin_panel"))
+
+    if User.query.filter_by(email=email).first():
+        flash("An account with that email already exists.", "error")
+        return redirect(url_for("admin_panel"))
+
+    if len(password) < 6:
+        flash("Password must be at least 6 characters.", "error")
+        return redirect(url_for("admin_panel"))
+
+    profile_photo = save_upload(request.files.get("profile_photo"))
+
+    # Admin-created accounts are auto-verified
+    new_user = User(
+        name=name,
+        email=email,
+        phone=phone or None,
+        role=role,
+        state=state,
+        district=district,
+        city_town=city_town,
+        department=department or None,
+        profile_photo=profile_photo,
+        is_verified=True,  # Admin-created employees are automatically verified
+    )
+    new_user.set_password(password)
+    db.session.add(new_user)
+    db.session.commit()
+    flash(f"{role.title()} account for {name} created and verified successfully.", "success")
+    return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/user/<int:user_id>/delete", methods=["POST"])
+@login_required
+@admin_required
+def admin_delete_user(user_id):
+    """Admin permanently deletes an authority or worker account."""
+    user = User.query.get_or_404(user_id)
+    if user.role not in ("authority", "worker"):
+        flash("Only authority and worker accounts can be deleted from here.", "warning")
+        return redirect(url_for("admin_panel"))
+    if user.id == current_user.id:
+        flash("You cannot delete your own account.", "warning")
+        return redirect(url_for("admin_panel"))
+    name = user.name
+    db.session.delete(user)
+    db.session.commit()
+    flash(f"{name}'s account has been permanently deleted.", "success")
+    return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/user/<int:user_id>/activity")
+@login_required
+@admin_required
+def admin_user_activity(user_id):
+    """Admin views an employee's activity log: assignments and status changes."""
+    user = User.query.get_or_404(user_id)
+    if user.role not in ("authority", "worker"):
+        flash("Activity log is only available for authority and worker accounts.", "warning")
+        return redirect(url_for("admin_panel"))
+
+    # Assignments this employee is involved in
+    assignments = (
+        IssueAssignment.query
+        .filter_by(user_id=user.id)
+        .order_by(IssueAssignment.assigned_at.desc())
+        .limit(50)
+        .all()
+    )
+
+    # Status changes this employee made
+    status_changes = (
+        StatusHistory.query
+        .filter_by(changed_by_id=user.id)
+        .order_by(StatusHistory.created_at.desc())
+        .limit(50)
+        .all()
+    )
+
+    return render_template(
+        "admin_user_activity.html",
+        employee=user,
+        assignments=assignments,
+        status_changes=status_changes,
+    )
 
 # =========================================================================
 # CLI COMMANDS (DB INIT & SEED DEMO DATA)

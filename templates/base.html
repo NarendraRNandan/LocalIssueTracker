@@ -95,6 +95,12 @@
           </li>
 
           <li>
+            <a href="{{ url_for('profile_edit') }}" class="nav-link {% if request.endpoint == 'profile_edit' %}active{% endif %}" title="Edit your profile">
+              ✏️ Profile
+            </a>
+          </li>
+
+          <li>
             <a href="{{ url_for('logout') }}" class="btn btn-sm btn-secondary" data-i18n="navSignOut">
               Sign Out
             </a>

@@ -1,24 +1,437 @@
 {% extends "base.html" %}
 {% block title %}Admin Governance • CivicTrack{% endblock %}
+{% block extra_head %}
+<style>
+.admin-hero {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  border-radius: var(--radius-xl);
+  padding: 2rem 2.5rem;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow-xl);
+}
+.admin-hero-stats {
+  display: flex; gap: 2rem; flex-wrap: wrap;
+}
+.admin-hero-stat {
+  text-align: center;
+}
+.admin-hero-stat b { font-size: 1.75rem; display: block; }
+.admin-hero-stat span { font-size: .8rem; opacity: .65; font-weight: 500; }
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.employee-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-md);
+  transition: background .15s;
+}
+.employee-row:hover { background: var(--slate-50); }
+.employee-row + .employee-row { border-top: 1px solid var(--border-subtle); }
+.emp-mini-avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: var(--primary-100);
+  color: var(--primary-700);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; font-weight: 800;
+  flex-shrink: 0; overflow: hidden;
+}
+.emp-mini-avatar img { width:100%;height:100%;object-fit:cover; }
+.emp-name { font-weight: 700; }
+.emp-meta { font-size: .8rem; color: var(--slate-500); margin-top: .1rem; }
+.emp-actions { display: flex; gap: .4rem; flex-wrap: wrap; }
+/* Modal overlay */
+.modal-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(15,23,42,.65);
+  z-index: 2000;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: #fff;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  max-width: 580px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: floatIn .2s ease;
+}
+.modal-header {
+  padding: 1.5rem 1.75rem 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.modal-body { padding: 1.5rem 1.75rem; }
+.modal-footer {
+  padding: 1rem 1.75rem 1.5rem;
+  display: flex; gap: .75rem; justify-content: flex-end;
+  border-top: 1px solid var(--border-subtle);
+}
+.form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 560px) {
+  .form-grid-2 { grid-template-columns: 1fr; }
+  .employee-row { grid-template-columns: auto 1fr; }
+}
+</style>
+{% endblock %}
 {% block content %}
-<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem">
-  <div><h1 style="font-size:1.8rem;font-weight:800">Admin Governance & Case Control</h1><p style="color:var(--slate-500)">Admin has full application control. Only authority accounts require verification; citizens and workers do not.</p></div>
-  <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Open All Cases</a>
+
+<!-- Admin Hero -->
+<div class="admin-hero">
+  <div>
+    <div style="font-size:.78rem;opacity:.55;text-transform:uppercase;letter-spacing:.08em;font-weight:600;">Admin Governance</div>
+    <h1 style="font-size:1.7rem;font-weight:800;margin:.25rem 0 .4rem;">System Control Centre</h1>
+    <p style="opacity:.7;font-size:.9rem;max-width:480px;">Manage employees, verify authorities, control all civic applications, and monitor system-wide activity.</p>
+  </div>
+  <div class="admin-hero-stats">
+    <div class="admin-hero-stat">
+      <b>{{ authorities|length }}</b>
+      <span>Authorities</span>
+    </div>
+    <div class="admin-hero-stat">
+      <b>{{ workers|length }}</b>
+      <span>Workers</span>
+    </div>
+    <div class="admin-hero-stat">
+      <b>{{ active_issues|length }}</b>
+      <span>Cases</span>
+    </div>
+  </div>
+  <a href="{{ url_for('dashboard') }}" class="btn btn-secondary" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.25);color:#fff;">Open Full Case Queue</a>
 </div>
-<div class="card" style="padding:1rem;margin-bottom:1rem"><b>Verification policy:</b> Authority = admin verified. Worker = no verification required. Citizen = immediate access.</div>
 
-<div class="card" style="padding:1rem;margin-bottom:1.5rem"><h3 class="card-title">🏛️ Authority Verification</h3>
-<div class="table-responsive"><table class="table"><thead><tr><th>Person</th><th>Contact</th><th>Department</th><th>Jurisdiction</th><th>Status</th><th>Action</th></tr></thead><tbody>
-{% for user in authorities %}<tr><td><b>{{ user.name }}</b></td><td>{{ user.email }}<div style="font-size:.75rem;color:var(--slate-500)">{{ user.phone or 'No phone' }}</div></td><td>{{ user.department or '-' }}</td><td>{{ user.city_town or '-' }}, {{ user.district or '-' }}, {{ user.state or '-' }}</td><td>{% if user.is_verified %}<span class="badge badge-resolved">Verified</span>{% else %}<span class="badge badge-reported">Pending</span>{% endif %}</td><td><form method="POST" action="{{ url_for('verify_user',user_id=user.id) }}"><button class="btn btn-sm {% if user.is_verified %}btn-secondary{% else %}btn-primary{% endif %}">{% if user.is_verified %}Revoke{% else %}Approve Authority{% endif %}</button></form></td></tr>{% else %}<tr><td colspan="6" style="text-align:center;padding:2rem">No authority accounts.</td></tr>{% endfor %}
-</tbody></table></div></div>
+<!-- Policy Info -->
+<div class="card" style="padding:.9rem 1.25rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:.75rem;">
+  <span style="font-size:1.2rem;">ℹ️</span>
+  <span style="font-size:.88rem;"><b>Policy:</b> Authority accounts require admin verification before login. Workers have immediate access. Admin-created accounts are auto-verified.</span>
+</div>
 
-<div class="card" style="padding:1rem;margin-bottom:1.5rem"><h3 class="card-title">👷 Worker Directory</h3><p style="color:var(--slate-500);font-size:.88rem">Workers do not require admin verification. Their location controls which local work can be assigned.</p>
-<div class="table-responsive"><table class="table"><thead><tr><th>Name</th><th>Contact</th><th>Department</th><th>Location</th><th>Access</th></tr></thead><tbody>
-{% for user in workers %}<tr><td><b>{{ user.name }}</b></td><td>{{ user.email }}<div>{{ user.phone or 'No phone' }}</div></td><td>{{ user.department or '-' }}</td><td>{{ user.city_town or '-' }}, {{ user.district or '-' }}, {{ user.state or '-' }}</td><td><span class="badge badge-resolved">Active</span></td></tr>{% else %}<tr><td colspan="5" style="text-align:center;padding:2rem">No workers registered.</td></tr>{% endfor %}
-</tbody></table></div></div>
+<!-- ============================================================
+     AUTHORITY SECTION
+     ============================================================ -->
+<div class="card" style="padding:1.5rem;margin-bottom:1.5rem;">
+  <div class="section-header">
+    <div>
+      <h2 style="font-size:1.1rem;font-weight:700;">🏛️ Authority Accounts</h2>
+      <div style="font-size:.82rem;color:var(--slate-500);margin-top:.2rem;">Verified authorities can manage issues in their jurisdiction only.</div>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="openAddModal('authority')">➕ Add Authority</button>
+  </div>
+  <div>
+    {% for user in authorities %}
+    <div class="employee-row">
+      <!-- Avatar -->
+      <div class="emp-mini-avatar">
+        {% if user.profile_photo %}
+          <img src="{{ url_for('static', filename='uploads/' + user.profile_photo) }}" alt="{{ user.name }}">
+        {% else %}
+          {{ user.name[0]|upper }}
+        {% endif %}
+      </div>
+      <!-- Info -->
+      <div>
+        <div class="emp-name">{{ user.name }}</div>
+        <div class="emp-meta">{{ user.email }} · {{ user.phone or 'No phone' }}</div>
+        <div class="emp-meta">{{ user.department or '—' }} · 📍 {{ user.city_town or '—' }}, {{ user.district or '—' }}, {{ user.state or '—' }}</div>
+      </div>
+      <!-- Verified status -->
+      <div>
+        {% if user.is_verified %}
+          <span class="badge badge-resolved">✓ Verified</span>
+        {% else %}
+          <span class="badge badge-reported">⏳ Pending</span>
+        {% endif %}
+      </div>
+      <!-- Verify toggle -->
+      <form method="POST" action="{{ url_for('verify_user', user_id=user.id) }}" style="display:inline;">
+        <button class="btn btn-sm {% if user.is_verified %}btn-secondary{% else %}btn-primary{% endif %}">
+          {% if user.is_verified %}Revoke{% else %}Approve{% endif %}
+        </button>
+      </form>
+      <!-- Admin actions -->
+      <div class="emp-actions">
+        <a href="{{ url_for('admin_edit_user', user_id=user.id) }}" class="btn btn-sm btn-secondary">✏️ Edit</a>
+        <a href="{{ url_for('admin_user_activity', user_id=user.id) }}" class="btn btn-sm btn-secondary">📊</a>
+        <form method="POST" action="{{ url_for('admin_delete_user', user_id=user.id) }}"
+              onsubmit="return confirm('Permanently delete {{ user.name }}? This cannot be undone.')">
+          <button type="submit" class="btn btn-sm btn-secondary" style="color:var(--danger-text);border-color:var(--danger-border);">🗑</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:2.5rem;color:var(--slate-400);">No authority accounts yet. Add one above.</div>
+    {% endfor %}
+  </div>
+</div>
 
-<div class="card" style="padding:1rem"><h3 class="card-title">🗂️ Application Management</h3>
-<div class="table-responsive"><table class="table"><thead><tr><th>Case</th><th>Issue</th><th>Location</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-{% for issue in active_issues %}<tr><td><b>{{ issue.case_code }}</b><div style="font-size:.72rem;color:var(--slate-500)">{{ issue.created_at.strftime('%d %b %Y') }}</div></td><td><b>{{ issue.title }}</b><div style="font-size:.76rem">{{ issue.category }} · {{ issue.priority }}</div></td><td>{{ issue.city_town }}, {{ issue.district }}<div style="font-size:.72rem">{{ issue.state }}</div></td><td><span class="badge badge-{{ issue.status|lower|replace(' ','') }}">{{ issue.status }}</span></td><td><div style="display:flex;gap:.35rem;flex-wrap:wrap"><a class="btn btn-sm btn-secondary" href="{{ url_for('issue_detail',issue_id=issue.id) }}">View</a><a class="btn btn-sm btn-primary" href="{{ url_for('admin_edit_issue',issue_id=issue.id) }}">Edit</a><form method="POST" action="{{ url_for('admin_cancel_issue',issue_id=issue.id) }}" onsubmit="return confirm('Cancel this application request?')"><button class="btn btn-sm btn-secondary">Cancel</button></form><form method="POST" action="{{ url_for('admin_delete_issue',issue_id=issue.id) }}" onsubmit="return confirm('Permanently delete this application? This cannot be undone.')"><button class="btn btn-sm btn-secondary">Delete</button></form></div></td></tr>{% else %}<tr><td colspan="5" style="text-align:center;padding:2rem">No active application requests.</td></tr>{% endfor %}
-</tbody></table></div></div>
+<!-- ============================================================
+     WORKER SECTION
+     ============================================================ -->
+<div class="card" style="padding:1.5rem;margin-bottom:1.5rem;">
+  <div class="section-header">
+    <div>
+      <h2 style="font-size:1.1rem;font-weight:700;">👷 Worker Directory</h2>
+      <div style="font-size:.82rem;color:var(--slate-500);margin-top:.2rem;">Workers have immediate access. Their location determines which issues they can be assigned to.</div>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="openAddModal('worker')">➕ Add Worker</button>
+  </div>
+  <div>
+    {% for user in workers %}
+    <div class="employee-row">
+      <div class="emp-mini-avatar">
+        {% if user.profile_photo %}
+          <img src="{{ url_for('static', filename='uploads/' + user.profile_photo) }}" alt="{{ user.name }}">
+        {% else %}
+          {{ user.name[0]|upper }}
+        {% endif %}
+      </div>
+      <div>
+        <div class="emp-name">{{ user.name }}</div>
+        <div class="emp-meta">{{ user.email }} · {{ user.phone or 'No phone' }}</div>
+        <div class="emp-meta">{{ user.department or '—' }} · 📍 {{ user.city_town or '—' }}, {{ user.district or '—' }}, {{ user.state or '—' }}</div>
+      </div>
+      <div>
+        <span class="badge badge-resolved">✓ Active</span>
+      </div>
+      <div></div><!-- spacer for grid alignment -->
+      <div class="emp-actions">
+        <a href="{{ url_for('admin_edit_user', user_id=user.id) }}" class="btn btn-sm btn-secondary">✏️ Edit</a>
+        <a href="{{ url_for('admin_user_activity', user_id=user.id) }}" class="btn btn-sm btn-secondary">📊</a>
+        <form method="POST" action="{{ url_for('admin_delete_user', user_id=user.id) }}"
+              onsubmit="return confirm('Permanently delete {{ user.name }}? This cannot be undone.')">
+          <button type="submit" class="btn btn-sm btn-secondary" style="color:var(--danger-text);border-color:var(--danger-border);">🗑</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:2.5rem;color:var(--slate-400);">No workers registered yet. Add one above.</div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ============================================================
+     APPLICATION MANAGEMENT
+     ============================================================ -->
+<div class="card" style="padding:1.5rem;">
+  <div class="section-header">
+    <div>
+      <h2 style="font-size:1.1rem;font-weight:700;">🗂️ Application Management</h2>
+      <div style="font-size:.82rem;color:var(--slate-500);margin-top:.2rem;">All civic cases — active and resolved. Admin can edit, cancel or permanently delete any case.</div>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Case</th>
+          <th>Issue</th>
+          <th>Location</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for issue in active_issues %}
+        <tr>
+          <td>
+            <b>{{ issue.case_code }}</b>
+            <div style="font-size:.72rem;color:var(--slate-500);">{{ issue.created_at.strftime('%d %b %Y') }}</div>
+          </td>
+          <td>
+            <b>{{ issue.title }}</b>
+            <div style="font-size:.76rem;color:var(--slate-500);">{{ issue.category }} · {{ issue.priority }}</div>
+          </td>
+          <td>
+            {{ issue.city_town }}, {{ issue.district }}
+            <div style="font-size:.72rem;color:var(--slate-500);">{{ issue.state }}</div>
+          </td>
+          <td>
+            <span class="badge badge-{{ issue.status|lower|replace(' ','') }}">{{ issue.status }}</span>
+          </td>
+          <td>
+            <div style="display:flex;gap:.35rem;flex-wrap:wrap;">
+              <a class="btn btn-sm btn-secondary" href="{{ url_for('issue_detail', issue_id=issue.id) }}">View</a>
+              {% if issue.status != 'Resolved' %}
+              <a class="btn btn-sm btn-primary" href="{{ url_for('admin_edit_issue', issue_id=issue.id) }}">Edit</a>
+              <form method="POST" action="{{ url_for('admin_cancel_issue', issue_id=issue.id) }}"
+                    onsubmit="return confirm('Cancel this case?')">
+                <button class="btn btn-sm btn-secondary">Cancel</button>
+              </form>
+              {% endif %}
+              <form method="POST" action="{{ url_for('admin_delete_issue', issue_id=issue.id) }}"
+                    onsubmit="return confirm('Permanently delete this case? Cannot be undone.')">
+                <button class="btn btn-sm btn-secondary" style="color:var(--danger-text);border-color:var(--danger-border);">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" style="text-align:center;padding:2.5rem;color:var(--slate-400);">No application cases found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+<!-- ============================================================
+     ADD EMPLOYEE MODAL
+     ============================================================ -->
+<div class="modal-overlay" id="add-employee-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="add-modal-title" style="font-size:1.1rem;font-weight:700;">➕ Add New Employee</h3>
+      <button onclick="closeAddModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--slate-400);">×</button>
+    </div>
+    <form method="POST" action="{{ url_for('admin_add_user') }}" enctype="multipart/form-data" id="add-emp-form">
+      <div class="modal-body">
+        <input type="hidden" name="role" id="add-role-input" value="worker">
+
+        <div style="background:var(--primary-50);border:1px solid var(--primary-100);border-radius:var(--radius-md);padding:.75rem 1rem;font-size:.85rem;color:var(--primary-700);margin-bottom:1.25rem;">
+          ✅ Admin-created employees are <strong>automatically verified</strong> and active immediately.
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="add-name">Full Name <span style="color:var(--danger-solid)">*</span></label>
+            <input id="add-name" name="name" class="form-control" type="text" required maxlength="120" placeholder="Full name">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="add-phone">Phone Number</label>
+            <input id="add-phone" name="phone" class="form-control" type="tel" maxlength="20" placeholder="+91 XXXXX XXXXX">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="add-email">Email Address <span style="color:var(--danger-solid)">*</span></label>
+          <input id="add-email" name="email" class="form-control" type="email" required placeholder="employee@example.com">
+        </div>
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="add-password">Password <span style="color:var(--danger-solid)">*</span></label>
+            <input id="add-password" name="password" class="form-control" type="password" required minlength="6" placeholder="Min. 6 characters">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="add-department">Department</label>
+            <input id="add-department" name="department" class="form-control" type="text" maxlength="100" placeholder="Roads, Sanitation...">
+          </div>
+        </div>
+
+        <!-- Jurisdiction -->
+        <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--slate-400);margin:.75rem 0 .5rem;border-top:1px solid var(--border-subtle);padding-top:.75rem;">📍 Jurisdiction</div>
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="add-state">State</label>
+            <select id="add-state" name="state" class="form-select" onchange="addLoadDistricts(this.value)">
+              <option value="">— Select State —</option>
+              {% for s in states %}
+                <option value="{{ s }}">{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="add-district">District</label>
+            <select id="add-district" name="district" class="form-select" onchange="addLoadCities(document.getElementById('add-state').value, this.value)">
+              <option value="">— Select District —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="add-city">City / Town</label>
+            <select id="add-city" name="city_town" class="form-select">
+              <option value="">— Select City/Town —</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="add-photo">Profile Photo</label>
+          <input id="add-photo" name="profile_photo" type="file" class="form-control" accept="image/*">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeAddModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="add-submit-btn">➕ Create Account</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+{% block extra_scripts %}
+<script>
+// Collect states for the add-modal dropdowns
+const allStates = {{ states | tojson }};
+
+function openAddModal(role) {
+  document.getElementById('add-role-input').value = role;
+  document.getElementById('add-modal-title').textContent = role === 'authority'
+    ? '🏛️ Add New Authority Account'
+    : '👷 Add New Worker Account';
+  document.getElementById('add-submit-btn').textContent = role === 'authority'
+    ? '➕ Create Authority'
+    : '➕ Create Worker';
+  // Reset form
+  document.getElementById('add-emp-form').reset();
+  document.getElementById('add-district').innerHTML = '<option value="">— Select District —</option>';
+  document.getElementById('add-city').innerHTML = '<option value="">— Select City/Town —</option>';
+  document.getElementById('add-employee-modal').classList.add('open');
+}
+
+function closeAddModal() {
+  document.getElementById('add-employee-modal').classList.remove('open');
+}
+
+// Close modal on overlay click
+document.getElementById('add-employee-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeAddModal();
+});
+
+// Cascading dropdowns for add-modal
+async function addLoadDistricts(state) {
+  const distEl = document.getElementById('add-district');
+  const cityEl = document.getElementById('add-city');
+  distEl.innerHTML = '<option value="">— Select District —</option>';
+  cityEl.innerHTML = '<option value="">— Select City/Town —</option>';
+  if (!state) return;
+  const res = await fetch(`/api/places/districts?state=${encodeURIComponent(state)}`);
+  const data = await res.json();
+  data.districts.forEach(d => {
+    distEl.innerHTML += `<option value="${d}">${d}</option>`;
+  });
+}
+
+async function addLoadCities(state, district) {
+  const cityEl = document.getElementById('add-city');
+  cityEl.innerHTML = '<option value="">— Select City/Town —</option>';
+  if (!district) return;
+  const res = await fetch(`/api/places/cities?state=${encodeURIComponent(state)}&district=${encodeURIComponent(district)}`);
+  const data = await res.json();
+  data.cities.forEach(c => {
+    cityEl.innerHTML += `<option value="${c}">${c}</option>`;
+  });
+}
+</script>
 {% endblock %}

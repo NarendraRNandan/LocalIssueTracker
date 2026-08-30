@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Activity Log — {{ employee.name }} • CivicTrack Admin{% endblock %}
+{% block extra_head %}
+<style>
+.activity-hero {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  border-radius: var(--radius-xl);
+  padding: 2rem 2.5rem;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow-lg);
+}
+.emp-avatar {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.25);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.8rem; font-weight: 800; color:#fff;
+  background: rgba(255,255,255,.1);
+  overflow: hidden; flex-shrink: 0;
+}
+.emp-avatar img { width:100%;height:100%;object-fit:cover; }
+.timeline-entry {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: .9rem 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.timeline-entry:last-child { border-bottom: none; }
+.timeline-dot {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .9rem; flex-shrink: 0; margin-top: .1rem;
+}
+.dot-assignment { background: var(--info-bg); color: var(--info-text); }
+.dot-status { background: var(--success-bg); color: var(--success-text); }
+.stat-pills {
+  display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1rem;
+}
+.stat-pill {
+  background: rgba(255,255,255,.12);
+  border-radius: var(--radius-full);
+  padding: .35rem 1rem;
+  font-size: .82rem; font-weight: 600;
+}
+</style>
+{% endblock %}
+{% block content %}
+<div style="max-width:860px;margin:0 auto;">
+
+  <!-- Breadcrumb -->
+  <div style="margin-bottom:1.25rem;font-size:.875rem;color:var(--slate-500);">
+    <a href="{{ url_for('admin_panel') }}" style="color:var(--primary-600);">← Admin Panel</a>
+    &nbsp;/&nbsp;
+    <a href="{{ url_for('admin_edit_user', user_id=employee.id) }}" style="color:var(--primary-600);">{{ employee.name }}</a>
+    &nbsp;/&nbsp; Activity Log
+  </div>
+
+  <!-- Hero -->
+  <div class="activity-hero">
+    <div class="emp-avatar">
+      {% if employee.profile_photo %}
+        <img src="{{ url_for('static', filename='uploads/' + employee.profile_photo) }}" alt="{{ employee.name }}">
+      {% else %}
+        {{ employee.name[0]|upper }}
+      {% endif %}
+    </div>
+    <div>
+      <div style="font-size:.78rem;opacity:.6;text-transform:uppercase;letter-spacing:.08em;font-weight:600;">Activity Log</div>
+      <h1 style="font-size:1.5rem;font-weight:800;margin:.2rem 0 .3rem;">{{ employee.name }}</h1>
+      <div style="opacity:.75;font-size:.88rem;">{{ employee.email }} · {{ employee.department or 'No dept.' }} · {{ employee.city_town or '—' }}, {{ employee.district or '—' }}</div>
+      <div class="stat-pills">
+        <span class="stat-pill">📋 {{ assignments|length }} Assignments</span>
+        <span class="stat-pill">🔄 {{ status_changes|length }} Status Changes</span>
+        <span class="stat-pill" style="text-transform:capitalize;">{{ employee.role }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assignments Section -->
+  <div class="card" style="padding:1.5rem;margin-bottom:1.5rem;">
+    <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:1rem;">📋 Case Assignments (last 50)</h2>
+    {% if assignments %}
+    <div>
+      {% for a in assignments %}
+      <div class="timeline-entry">
+        <div class="timeline-dot dot-assignment">📌</div>
+        <div style="flex:1;">
+          <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+            <div>
+              <a href="{{ url_for('issue_detail', issue_id=a.issue.id) }}" style="font-family:monospace;font-weight:700;color:var(--primary-600);">{{ a.issue.case_code }}</a>
+              <span class="badge badge-{{ a.status }}" style="margin-left:.5rem;">{{ a.status|title }}</span>
+              <span class="badge badge-{{ a.issue.status|lower|replace(' ','') }}" style="margin-left:.25rem;">{{ a.issue.status }}</span>
+            </div>
+            <span style="font-size:.78rem;color:var(--slate-400);">{{ a.assigned_at.strftime('%d %b %Y, %I:%M %p') }}</span>
+          </div>
+          <div style="font-weight:600;margin:.2rem 0;">{{ a.issue.title }}</div>
+          <div style="font-size:.82rem;color:var(--slate-500);">
+            📍 {{ a.issue.city_town }}, {{ a.issue.district }} · {{ a.issue.category }}
+            {% if a.assigned_by %} · Assigned by: {{ a.assigned_by.name }}{% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:2rem;color:var(--slate-400);">No assignments found for this employee.</div>
+    {% endif %}
+  </div>
+
+  <!-- Status Changes Section -->
+  <div class="card" style="padding:1.5rem;">
+    <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:1rem;">🔄 Status Changes Made (last 50)</h2>
+    {% if status_changes %}
+    <div>
+      {% for sc in status_changes %}
+      <div class="timeline-entry">
+        <div class="timeline-dot dot-status">🔄</div>
+        <div style="flex:1;">
+          <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+            <div>
+              <a href="{{ url_for('issue_detail', issue_id=sc.issue_id) }}" style="font-family:monospace;font-weight:700;color:var(--primary-600);">{{ sc.issue.case_code }}</a>
+              {% if sc.old_status %}<span class="badge badge-{{ sc.old_status|lower|replace(' ','') }}" style="margin-left:.5rem;">{{ sc.old_status }}</span> →{% endif %}
+              <span class="badge badge-{{ sc.new_status|lower|replace(' ','') }}" style="margin-left:.25rem;">{{ sc.new_status }}</span>
+            </div>
+            <span style="font-size:.78rem;color:var(--slate-400);">{{ sc.created_at.strftime('%d %b %Y, %I:%M %p') }}</span>
+          </div>
+          <div style="font-weight:600;margin:.2rem 0;">{{ sc.issue.title }}</div>
+          {% if sc.note %}
+          <div style="font-size:.82rem;color:var(--slate-500);font-style:italic;">"{{ sc.note }}"</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:2rem;color:var(--slate-400);">No status changes recorded for this employee.</div>
+    {% endif %}
+  </div>
+
+  <div style="display:flex;gap:1rem;margin-top:1.5rem;justify-content:flex-end;">
+    <a href="{{ url_for('admin_edit_user', user_id=employee.id) }}" class="btn btn-primary">✏️ Edit Profile</a>
+    <a href="{{ url_for('admin_panel') }}" class="btn btn-secondary">← Back to Admin</a>
+  </div>
+</div>
+{% endblock %}
